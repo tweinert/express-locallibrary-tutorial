@@ -1,3 +1,4 @@
+const book = require("../models/book");
 const Book = require("../models/book");
 const BookInstance = require("../models/bookinstance");
 const asyncHandler = require("express-async-handler");
@@ -142,6 +143,44 @@ exports.bookinstance_update_get = asyncHandler(async (req, res, next) => {
 });
 
 // Handle bookinstance update on POST.
-exports.bookinstance_update_post = asyncHandler(async (req, res, next) => {
-  res.send("NOT IMPLEMENTED: BookInstance update POST");
-});
+exports.bookinstance_update_post = [
+  // Validate and sanitize fields
+  body("book", "Book must be specified").trim().isLength({ min: 1 }).escape(),
+  body("imprint", "Imprint must be specified")
+    .trim()
+    .isLength({ min: 1 })
+    .escape(),
+  body("status").escape(),
+  body("due_back", "Invalid date")
+    .optional({ values: "falsy" })
+    .isISO8601()
+    .toDate(),
+  
+  // Process request
+  asyncHandler(async (req, res, next) => {
+    const errors = validationResult(req);
+
+    const bookInstance = new BookInstance({
+      book: req.body.book,
+      imprint: req.body.imprint,
+      status: req.body.status,
+      due_back: req.body.due_back,
+      _id: req.params.id,
+    });
+
+    if (!errors.isEmpty()) {
+      const allBooks = await Book.find({}, "title").sort({ title: 1 }).exec();
+      Book.find().sort({ title: 1 }).exec();
+      res.render("bookinstance_form", {
+        title: "Update Book Instance",
+        book_list: allBooks,
+        bookinstance: bookInstance,
+        errors: errors.array(),
+      });
+      return;
+    } else {
+      const updatedBookInstance = await BookInstance.findByIdAndUpdate(req.params.id, bookInstance, {});
+      res.redirect(updatedBookInstance.url);
+    }
+  })
+];
